@@ -1,0 +1,212 @@
+You are to design and implement a local AI orchestration system that uses Git as the persistent memory layer and supports multiple LLM “roles” using CLI-based model tools.
+
+The system must be designed for a Debian Linux server and operate on a local Git repository.
+
+It must support two model backends:
+- Claude (via Claude Code CLI)
+- GPT (via Codex CLI or equivalent OpenAI Codex CLI)
+
+No API-based orchestration layer should be required. All model interactions must be executed through CLI tools that already authenticate via user subscriptions.
+
+---
+
+# CORE GOAL
+
+Build a system where a user can issue a single command like:
+
+  ai run "task description"
+
+and the system will automatically:
+
+1. Use Claude to create a plan
+2. Store that plan in the Git repository
+3. Use GPT (Codex CLI) to implement the plan in the codebase
+4. Commit changes
+5. Use Claude again to review the implementation
+6. Store review results in Git
+7. Optionally iterate if review finds issues
+
+---
+
+# ARCHITECTURE REQUIREMENTS
+
+## 1. Git as Memory Layer
+
+All persistent state must be stored in Git, including:
+
+- plans
+- decisions
+- context summaries
+- implementation outputs
+- review outputs
+
+The system must NEVER rely on model memory between steps.
+
+Use a structured folder layout:
+
+/ai/
+  plans/
+  implementations/
+  reviews/
+  context/
+  decisions.md
+  task-log.json
+
+Each run must be fully reconstructable from Git history alone.
+
+---
+
+## 2. Model Roles
+
+The system must enforce strict role separation:
+
+### Claude Role
+- planning
+- reasoning
+- architecture design
+- code review
+- summarization
+
+### GPT Role (Codex CLI)
+- code implementation
+- refactoring
+- file edits
+- patch generation
+
+---
+
+## 3. Workflow Engine
+
+Implement a deterministic workflow engine:
+
+TASK → PLAN → IMPLEMENT → REVIEW → (OPTIONAL FIX LOOP)
+
+Each stage must:
+- read required Git files
+- call the correct CLI tool
+- write output to file
+- commit changes with structured commit messages
+
+---
+
+## 4. CLI Interface
+
+Implement a single CLI tool:
+
+  ai
+
+Commands:
+
+  ai run "<task>"
+  ai plan "<task>"
+  ai implement <plan-file>
+  ai review <implementation>
+  ai status
+
+The default "run" command executes the full pipeline.
+
+---
+
+## 5. Context Handling
+
+No model should receive full history.
+
+Instead implement:
+
+- context summarization step after each phase
+- stored in /ai/context/context.md
+- only latest context is passed forward
+
+This ensures scalability for large repositories.
+
+---
+
+## 6. Model Invocation Rules
+
+Claude CLI usage example:
+  claude -p "<prompt>"
+
+Codex CLI usage example:
+  codex "<prompt>"
+
+or equivalent supported non-interactive mode.
+
+All prompts must explicitly include:
+- current task
+- relevant Git file references
+- required output format
+
+---
+
+## 7. Output Formats (STRICT)
+
+Claude PLAN output:
+- YAML or Markdown structured plan
+- must include steps, files, risks
+
+GPT IMPLEMENT output:
+- file changes or patch-style diff description
+- must list files modified
+
+Claude REVIEW output:
+- categorized issues:
+  - bugs
+  - security
+  - architecture
+  - improvements
+
+---
+
+## 8. Git Discipline
+
+Every stage must create a commit:
+
+Example:
+
+- "claude: generate plan for <task>"
+- "gpt: implement <task>"
+- "claude: review implementation"
+
+System must ensure atomic commits per stage.
+
+---
+
+## 9. Safety Requirements
+
+- system must NEVER overwrite uncommitted work
+- must always operate in a git branch per task:
+    ai/task/<task-id>
+- must support rollback via git reset
+- must show diff before applying changes
+
+---
+
+## 10. Extensibility (IMPORTANT)
+
+Design system so future upgrades can include:
+
+- browser UI dashboard
+- additional models (Gemini, local models)
+- parallel agents
+- async task queue
+
+BUT do not implement these now—only architecture hooks.
+
+---
+
+# FINAL OUTPUT
+
+Generate:
+
+1. Full working CLI tool in Node.js or Python
+2. Clean modular architecture:
+   - router
+   - git manager
+   - claude adapter
+   - codex adapter
+   - workflow engine
+3. README explaining usage
+4. Example run for a sample task
+5. Folder structure
+
+The system should be production-quality, not a toy script.
