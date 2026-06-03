@@ -1,0 +1,311 @@
+You are to build a full cross-platform AI orchestration system consisting of:
+
+1. Desktop application (Tauri)
+2. Mobile application (React Native / Expo)
+3. Backend server (Debian Linux)
+4. Worker daemon system
+5. Git-based memory layer
+6. CLI + API hybrid orchestration layer
+
+The system enables a user to submit tasks from desktop or mobile, and have AI agents (Claude + GPT via CLI tools) execute structured multi-step workflows:
+
+PLAN (Claude) → IMPLEMENT (GPT) → REVIEW (Claude)
+
+---
+
+# 🧠 CORE PRINCIPLES
+
+## 1. Server is the source of truth
+- All AI execution happens on the Debian server
+- Desktop and mobile apps are only clients
+- No local AI execution on devices
+
+## 2. Git is the memory layer
+All state is stored in a local Git repository:
+
+/ai/
+  tasks/
+  plans/
+  implementations/
+  reviews/
+  context/
+  logs/
+
+Every task must be fully reconstructable from Git history.
+
+## 3. Stateless clients
+Desktop and mobile apps must not store execution state.
+They only display:
+- task status
+- logs
+- results
+- diffs
+
+---
+# PROVIDER ABSTRACTION LAYER
+
+The system MUST implement a provider-agnostic LLM interface.
+
+All model execution must go through a provider registry.
+
+No model names (Claude, GPT, etc.) may be hardcoded in workflow logic.
+
+Instead, use config-based routing:
+
+- planning → provider name from config
+- implementation → provider name from config
+- review → provider name from config
+
+Each provider must implement:
+- run(prompt)
+- optional stream(prompt)
+
+Providers must be swappable without modifying workflow engine.
+
+
+
+# 🏗️ SYSTEM ARCHITECTURE
+
+## Backend (Debian Server)
+
+Technology:
+- Node.js (NestJS or Express) OR Python (FastAPI)
+
+Responsibilities:
+- Task API
+- Task queue management
+- Workflow orchestration
+- Communication with worker daemon
+- Streaming logs (WebSockets / SSE)
+- Git operations interface
+
+Endpoints:
+
+POST /task
+GET /task/:id
+GET /task/:id/logs
+GET /task/:id/status
+GET /task/:id/artifacts
+GET /task/:id/diff
+
+---
+
+## Worker Daemon (Always running system service)
+
+Must run via systemd.
+
+Responsibilities:
+- Poll task queue
+- Execute AI pipeline
+- Manage Git operations
+- Call CLI tools:
+    - claude -p
+    - codex or GPT CLI tool
+
+Workflow per task:
+
+1. Create git branch:
+   ai/task/<task-id>
+
+2. CLAUDE STEP (Planning):
+   - Generate structured plan
+   - Save to /ai/plans/<task-id>.md
+   - Commit changes
+
+3. GPT STEP (Implementation):
+   - Read plan file
+   - Modify codebase
+   - Write implementation files
+   - Commit changes
+
+4. CLAUDE STEP (Review):
+   - Run git diff
+   - Generate review report
+   - Save to /ai/reviews/<task-id>.md
+   - Commit changes
+
+5. Mark task complete
+
+---
+
+## Git Memory Layer
+
+Git is mandatory for all persistence.
+
+Rules:
+- Every step must be committed
+- Each task has its own branch
+- No overwriting history
+- All AI outputs must be stored as files
+
+Branch structure:
+main
+ └── ai/task/<task-id>
+
+---
+
+# 💻 DESKTOP APP (TAURI)
+
+## Technology:
+- Tauri (Rust backend)
+- React (frontend UI)
+
+## Features:
+
+### UI Layout:
+- Left sidebar:
+  - task history
+  - active tasks
+- Main panel:
+  - chat-style interface
+- Right panel:
+  - file viewer (Git repo)
+  - diff viewer
+  - logs stream
+
+### Features:
+- Create task
+- View task execution live
+- Stream logs via WebSocket
+- View Git diffs
+- View artifacts (plan, code, review)
+
+### API communication:
+- Connects to backend server via HTTP + WebSocket only
+
+---
+
+# 📱 MOBILE APP (React Native / Expo)
+
+## Technology:
+- React Native (Expo recommended)
+
+## Features:
+
+### UI:
+- Simplified chat interface
+- Task submission screen
+- Task status list
+- Log viewer (simplified)
+- Artifact viewer (text only)
+
+### Constraints:
+- No heavy diff viewer (mobile optimized)
+- No Git UI
+- Read-only artifacts
+
+### Features:
+- Submit task
+- View progress
+- Receive completion notification (optional push)
+
+---
+
+# 🔁 TASK LIFECYCLE
+
+Every task follows:
+
+1. CREATED (client submits)
+2. QUEUED (backend stores)
+3. RUNNING (worker active)
+4. PLANNING (Claude)
+5. IMPLEMENTING (GPT)
+6. REVIEWING (Claude)
+7. COMPLETED
+8. FAILED (with logs)
+
+---
+
+# 🧩 MODEL INTEGRATION
+
+## Claude CLI usage:
+claude -p "<prompt>"
+
+Used for:
+- planning
+- architecture
+- review
+- reasoning
+
+---
+
+## GPT / Codex CLI usage:
+codex "<prompt>"
+
+Used for:
+- code generation
+- file modification
+- implementation
+
+---
+
+# 📡 REAL-TIME UPDATES
+
+Use WebSockets or SSE:
+
+Events:
+- task_started
+- plan_generated
+- implementation_started
+- review_generated
+- task_completed
+- error
+
+---
+
+# 📂 DATA STRUCTURE
+
+/ai/
+  tasks/
+    <task-id>.json
+  plans/
+    <task-id>.md
+  implementations/
+    <task-id>.diff or files
+  reviews/
+    <task-id>.md
+  logs/
+    <task-id>.log
+  context/
+    global.md
+
+---
+
+# 🔐 SAFETY RULES
+
+- Never run destructive Git operations without branch isolation
+- Always create new branch per task
+- Always log AI outputs before applying changes
+- Never overwrite uncommitted changes
+- Always show diff before final commit
+
+---
+
+# 🚀 EXTENSIBILITY (DO NOT IMPLEMENT YET)
+
+System must be designed to support later:
+
+- multiple AI models (Gemini, local LLMs)
+- parallel agents
+- queue scaling (Redis or RabbitMQ)
+- authentication system
+- multi-user support
+- plugin system for tools
+
+---
+
+# 🎯 FINAL OUTPUT REQUIRED FROM YOU (CODEX)
+
+Generate:
+
+1. Full backend server implementation
+2. Worker daemon systemd service
+3. Tauri desktop app (React UI)
+4. React Native Expo mobile app
+5. Shared API client module
+6. Folder structure
+7. Example task execution flow
+8. README with deployment instructions for Debian server
+
+The system must be production-structured, not a prototype.
+
